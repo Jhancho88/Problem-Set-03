@@ -107,15 +107,16 @@ saveRDS(fuerza_trabajo_df, "input/fuerza_de_trabajo.rds")
 saveRDS(no_ocupados_df, "input/no_ocupados.rds")
 saveRDS(ocupados_df, "input/ocupados.rds")
 
-
+## PROCESAMIENTO FUERZA LABORAL
 # Cargar los datos de la base "fuerza_de_trabajo"
 fuerza_de_trabajo <- readRDS("input/fuerza_de_trabajo.rds")
 head(x = fuerza_de_trabajo, n = 5)
+print(colnames(fuerza_de_trabajo)) # Verificar las columnas disponibles en el dataframe
 
-# Calcular la suma de individuos en la fuerza laboral y PET por mes, usando FEX_C18
+# Calcular la suma de individuos en la fuerza laboral y PET por mes
 suma_fuerza_laboral <- fuerza_de_trabajo %>%
   filter(FT == 1 | PET == 1) %>%
-  group_by(Month) %>%
+  group_by(MES) %>%
   summarise(Total_FEX = sum(FEX_C18, na.rm = TRUE))
 
 # Ver los resultados
@@ -123,53 +124,36 @@ print(suma_fuerza_laboral)
 
 
 
-
-
-
-
-
-fuerza_de_trabajo <- fuerza_trabajo_df
-
-
-no_ocupados <- no_ocupados_df
-# Para ver las primeras 5 filas de la base modificada
-head(x = no_ocupados, n = 5)
-
-ocupados <- ocupados_df
-# Para ver las primeras 5 filas de la base modificada
+# PROCESAMIENTO OCUPOADOS
+# Cargar los datos de la base "ocupados"
+ocupados <- readRDS("input/ocupados.rds")
 head(x = ocupados, n = 5)
+print(colnames(ocupados)) # Verificar las columnas disponibles en el dataframe
 
-# Sumar individuos en fuerza_de_trabajo
-resumen_fuerza_trabajo <- fuerza_de_trabajo %>%
-  filter(ft == 1 | pet == 1) %>%
-  group_by(mes) %>%
-  summarise(Total = sum(factor_expansion))
+# Calcular la suma de individuos empleados por mes
+suma_ocupados <- ocupados %>%
+  filter(FT == 1) %>%
+  group_by(MES) %>%
+  summarise(Total_FEX = sum(FEX_C18, na.rm = TRUE))
 
-# Mostrar el resultado
-print(resumen_fuerza_trabajo)
-
-
-
-# Sumar individuos en no_ocupados
-resumen_no_ocupados <- no_ocupados %>%
-  filter(dsi == 1) %>%
-  group_by(mes) %>%
-  summarise(Total = sum(factor_expansion))
-
-# Mostrar el resultado
-print(resumen_no_ocupados)
+# Ver los resultados
+print(suma_ocupados)
 
 
+# PROCESAMIENTO NO OCUPADOS
+# Cargar los datos de la base "no_ocupados"
+no_ocupados <- readRDS("input/no_ocupados.rds")
+head(x = no_ocupados, n = 5)
+print(colnames(no_ocupados)) # Verificar las columnas disponibles en el dataframe
 
-# Sumar individuos en ocupados
-resumen_ocupados <- ocupados %>%
-  filter(ft == 1) %>%
-  group_by(mes) %>%
-  summarise(Total = sum(factor_expansion))
+# Calcular la suma de individuos NO OCUPADOS por mes, usando FEX_C18
+suma_no_ocupados <- no_ocupados %>%
+  filter(DSI == 1) %>%
+  group_by(MES) %>%
+  summarise(Total_FEX = sum(FEX_C18, na.rm = TRUE))
 
-# Mostrar el resultado
-print(resumen_ocupados)
-
+# Ver los resultados
+print(suma_no_ocupados)
 
 
 
