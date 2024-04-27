@@ -17,7 +17,8 @@ p_load(rio, # permite leer/escribir archivos desde diferentes formatos
        data.table,
        tidyverse, # colección de paquetes para ciencia de datos (incluye dplyr)
        skimr, # describe un conjunto de datos
-       dplyr
+       dplyr,
+       ggplot2
        )
 
 # Obtener y establecer el directorio de trabajo
@@ -110,6 +111,7 @@ saveRDS(ocupados_df, "input/ocupados.rds")
 ## PROCESAMIENTO FUERZA LABORAL
 # Cargar los datos de la base "fuerza_de_trabajo"
 fuerza_de_trabajo <- readRDS("input/fuerza_de_trabajo.rds")
+
 head(x = fuerza_de_trabajo, n = 5)
 print(colnames(fuerza_de_trabajo)) # Verificar las columnas disponibles en el dataframe
 
@@ -158,294 +160,115 @@ print(suma_no_ocupados)
 
 
 
+## 2.2. Colapsar datos a nivel mensual
+# Unifica todas las bases en una única base llamada Output
+# Debe contener al menos cinco columnas: Población en edad de trabajar, fuerza laboral, ocupados, desempleados y el mes correspondiente.
+
+# Cargar las bases de datos
+fuerza_de_trabajo <- readRDS("input/fuerza_de_trabajo.rds")
+ocupados <- readRDS("input/ocupados.rds")
+no_ocupados <- readRDS("input/no_ocupados.rds")
+
+# Seleccionar las variables especificadas de cada base de datos
+fuerza_de_trabajo <- fuerza_de_trabajo[, c("PET", "FT", "MES")]
+ocupados <- ocupados[, c("FT", "MES")]
+no_ocupados <- no_ocupados[, c("DSI", "MES")]
 
+# Convertir data.frames a data.tables
+# Tuve que ejecutar esta transformacion porque las columnas son distintas en cada base y solo asi podia manipularlas mas facilmente
+# aplicando un N/A en los registros en los que fuera necesario. realice un append.
+fuerza_de_trabajo_dt <- as.data.table(fuerza_de_trabajo)
+ocupados_dt <- as.data.table(ocupados)
+no_ocupados_dt <- as.data.table(no_ocupados)
 
+# Unificar todas las bases en una única base usando rbindlist con fill = TRUE
+output_dt <- rbindlist(list(fuerza_de_trabajo_dt, ocupados_dt, no_ocupados_dt), fill = TRUE)
 
+# Verificar la estructura del dataframe combinado
+print(str(output_dt))
 
+# Guardar la base de datos combinada en la subcarpeta "output"
+saveRDS(output_dt, "output/output.rds")
 
 
 
+## 2.3. Tasas de desempleo y ocupacion
+# Divida el número de individuos desempleados por la fuerza laboral para obtener la tasa de desempleo
+# Divida el número de ocupados por la población en edad de trabajar para obtener la tasa de ocupación.
 
+output <- readRDS("output/output.rds") # Cargar la base de datos combinada
+output <- as.data.table(output) # Convertir a data.table
+print(str(output)) # Verificacion
 
+# Formateo de numero en las variables requeridas (y tratamiento a N/A)
+output[, c("FT", "PET", "DSI") := lapply(.SD, function(x) fifelse(is.na(x), 0, x)), .SDcols = c("FT", "PET", "DSI")]
 
+# Calcular la suma de no ocupados, ocupados y la fuerza laboral por MES si está disponible
+aggregated_data <- output[, .(Total_DSI = sum(DSI),
+                              Total_FT = sum(FT),
+                              Total_PET = sum(PET)), by = MES]
 
+# Calcular la tasa de desempleo y la tasa de ocupación
+aggregated_data[, `:=` (Tasa_Desempleo = Total_DSI / Total_FT,
+                        Tasa_Ocupacion = Total_FT / Total_PET)]
 
+# Mostrar los resultados
+print(aggregated_data)
 
 
 
 
+### GGPLOT2
+# Grafique las tasas de desempleo y ocupación para cada mes utilizando la función geom_line.
+# Realice un pivot wider a las tasas de modo que los valores estén en una sola columna.
 
+# Preparacion de datos para el grafico
+aggregated_data_long <- aggregated_data %>%
+  pivot_longer(cols = c("Tasa_Desempleo", "Tasa_Ocupacion"), 
+               names_to = "Tipo_Tasa", 
+               values_to = "Valor")
 
+# Verificar la estructura de los datos transformados
+print(aggregated_data_long)
 
 
+# Grafica
+ggplot(aggregated_data_long, aes(x = MES, y = Valor, color = Tipo_Tasa, group = Tipo_Tasa)) +
+  geom_line() +
+  labs(title = "Tasas de Desempleo y Ocupación por Mes",
+       x = "Mes",
+       y = "Valor de la Tasa",
+       color = "Tipo de Tasa") +
+  theme_minimal()
 
 
+# Otro intento para mejorar legibilidad
+# Aumentar la base size para todo el texto en el gráfico
+base_size <- 14
 
+# Crear el gráfico con mejoras visuales
+p <- ggplot(aggregated_data_long, aes(x = MES, y = Valor, color = Tipo_Tasa, group = Tipo_Tasa)) +
+  geom_line(size = 1) +  # Hacer las líneas un poco más gruesas
+  scale_x_discrete(name = "Mes") +
+  scale_y_continuous(name = "Valor de la Tasa", labels = scales::percent) +
+  scale_color_manual(values = c("Tasa_Desempleo" = "red", "Tasa_Ocupacion" = "blue")) +
+  labs(title = "Tasas de Desempleo y Ocupación por Mes",
+       subtitle = "Datos de la Gran Encuesta Integrada de Hogares (GEIH) 2023",
+       caption = "Fuente: DANE") +
+  theme_minimal(base_size = base_size) +
+  theme(
+    text = element_text(size = base_size), # Aumentar el tamaño de la fuente
+    plot.title = element_text(face = "bold", size = base_size * 1.2), # Título en negrita y más grande
+    plot.subtitle = element_text(size = base_size), # Subtítulo
+    plot.caption = element_text(size = base_size * 0.8), # Texto de la fuente más pequeño
+    axis.text.x = element_text(angle = 45, hjust = 1), # Rotar las etiquetas del eje x
+    legend.title = element_text(size = base_size), # Tamaño de fuente para el título de la leyenda
+    legend.text = element_text(size = base_size) # Tamaño de fuente para el texto de la leyenda
+  )
 
-identification <- import("input/Módulo de identificación.dta")
-location <- import("input/Módulo de sitio o ubicación.dta")
+# Visualizar el gráfico
+print(p)
 
-## 1.2. Exportar
-export(x=identification, file="output/identification.rds")
-export(x=location, file="output/location.rds")
+# Guardar el gráfico
+ggsave("output/tasa_desempleo_ocupacion.png", p, width = 12, height = 8, dpi = 300)
 
-## Explorar base de datos
-head(x = identification , n = 5) # Primeras 5 obs de identification
-head(x = location , n = 5) # Primeras 5 obs de location
-
-str(object = identification) ## estructura de "identification"
-str(object = location) ## estructura de "location"
-
-glimpse(x = identification) ## estructura de`"identification"
-glimpse(x = location) ## estructura de`"identification"
-
-skim(data = identification)
-skim(data = location)
-
-summary(identification)  ## describir base de datos "identification"
-summary(location)  ## describir base de datos "location"
-
-
-
-### 2. GENERAR VARIABLES
-
-## 2.1. Añade variable "business_type" a la base "identification"
-identification <- mutate(identification, 
-                         bussiness_type = case_when(
-                           GRUPOS4 == "01" ~ "Agricultura",
-                           GRUPOS4 == "02" ~ "Industria manufacturera",
-                           GRUPOS4 == "03" ~ "Comercio",
-                           GRUPOS4 == "04" ~ "Servicios",
-                         ))
-
-# Para ver las primeras 5 filas de la base modificada
-head(x = identification, n = 5)
-
-
-## 2.2. Crear variable grupo_etario
-# Debe dividir a los propietarios de micronegocios en 4 grupos etarios.
-# Rangos de edades seleccionados deben ser justificados.
-identification <- mutate(identification,
-                         grupo_etario = case_when(
-                           P241 >= 18 & P241 <= 34 ~ "Adultos Jóvenes",
-                           P241 >= 35 & P241 <= 45 ~ "Adultos A",
-                           P241 >= 46 & P241 <= 56 ~ "Adultos B",
-                           P241 >= 57 ~ "Adultos mayores"
-                         ))
-
-# Para ver las primeras 5 filas de la base modificada
-head(x = identification, n = 5)
-
-# Rango 1: Del valor mínimo al primer cuartil
-# Rango 2: Del primer cuartil a la mediana
-# Rango 3: Entre la mediana y el tercer cuartil
-# Rango 4: Del tercer cuartil hasta el valor máximo
-
-
-
-## 2.3. Sobre el objeto "location", genere la variable "ambulante"
-# Sera igual a 1 si la variable P3053 es igual a 3, 4 o 5.
-location <- mutate(location,
-                   ambulante = case_when(
-                     P3053 %in% c(3, 4, 5) ~ 1,
-                     TRUE ~ 0 # Asigna 0 a cualquier otro valor de P3053
-                   ))
-
-# Para ver las primeras 5 filas de la base modificada
-head(x = location, n = 5)
-
-
-
-### 3. ELIMINAR FILAS/COLUMNAS DE UN CONJUNTO DE DATOS
-# 3.1. Almacene en un objeto llamado identification_sub las variables:
-# DIRECTORIO, SECUENCIA_P, SECUENCIA_ENCUESTA, grupo_etario, ambulante, COD_DEPTO y F_EXP.
-names(identification) # Para "identification"
-names(location) # Para "location"
-
-# Realizamos la unión de los dataframes basándonos en las columnas comunes.
-identification_full <- left_join(identification, location, 
-                                 by = c("DIRECTORIO", "SECUENCIA_P", "SECUENCIA_ENCUESTA"))
-
-# Ahora seleccionamos solo las columnas especificadas para crear 'identification_sub'.
-identification_sub <- select(identification_full, 
-                             DIRECTORIO, SECUENCIA_P, SECUENCIA_ENCUESTA, 
-                             grupo_etario, ambulante, COD_DEPTO.x, F_EXP.x)
-
-# Verificamos primeras filas del nuevo dataframe.
-head(identification_sub)
-
-
-
-## 3.2. Del objeto location seleccione solo las variables:
-# DIRECTORIO, SECUENCIA_P, SECUENCIA_ENCUESTA, ambulante P3054, P469, COD_DEPTO, F_EXP
-# Guárdelo en nuevo objeto llamado location_sub.
-location_sub <- select(location, 
-                       DIRECTORIO, SECUENCIA_P, SECUENCIA_ENCUESTA, 
-                       ambulante, P3054, P469, COD_DEPTO, F_EXP) # Seleccion de variables en location
-
-head(location_sub)
-
-
-
-
-### 4. COMBINAR BASES DE DATOS
-
-# 4.1. Use las variables DIRECTORIO, SECUENCIA_P y SECUENCIA_ENCUESTA
-# para unir en una única base de datos, los objetos location_sub y identification_sub.
-
-# Uniendo "location_sub" y "identification_sub" en una única base de datos
-combined_data <- full_join(location_sub, identification_sub, by = c("DIRECTORIO", "SECUENCIA_P", "SECUENCIA_ENCUESTA"))
-
-
-
-### 5. DESCRIPTIVAS
-# 5.1. Usando funciones como skim o summary,
-# cree breves estadísticas descriptivas de la base de datos creada previamente.
-# (HINT: Observaciones en NA, conteo de variables únicas)
-summary(combined_data)
-skim(combined_data)
-
-
-
-# 5.2. Use las funciones group_by y summarise para extraer variables descriptivas, como:
-# cantidad de asociados por departamento, grupo etario, entre otros.
-# Además, cree un pequeño párrafo con los hallazgos que encuentre.
-library(dplyr)
-
-# Cantidad de asociados por departamento
-asociados_por_departamento <- combined_data %>%
-  group_by(COD_DEPTO) %>%
-  summarise(cantidad_asociados = n())
-
-asociados_por_departamento
-
-
-# Cantidad de asociados por grupo etario
-asociados_por_grupo_etario <- combined_data %>%
-  group_by(grupo_etario) %>%
-  summarise(cantidad_asociados = n())
-
-asociados_por_grupo_etario
-
-
-# Analisis
-
-# La variación en el número de asociados por departamento sugiere diferencias regionales en participación, con los departamentos 13 y 08 liderando en número de asociados. Esto podría reflejar factores como mayor población y actividad económica, indicando también oportunidades de crecimiento en regiones con menos asociados. Estos hallazgos podrían ayudar a la organización a optimizar sus estrategias de alcance y engagement.
-# La distribución de asociados por grupo etario es relativamente equilibrada, destacándose ligeramente los Adultos Jóvenes. Esto muestra éxito en atraer una amplia diversidad de edades, aunque el interés predominante de los Adultos Jóvenes sugiere que las ofertas de la organización podrían estar más alineadas con sus necesidades o intereses. Analizar más detalladamente las razones detrás de estas distribuciones podría ayudar a mejorar la diversidad etaria y el atractivo de la organización.
-
-
-
-
-
-
-
-# INTRO A R: OPERADORES Y FUNCIONES
-# -----------------------------------------------
-
-# Operadores aritméticos:
-# Realize una operación que calcule el resultado de 7 elevado a la potencia de 3.
-7**3
-
-# Operador lógico:
-# Ejemplo de expresión que use un operador lógico para verificar si el valor de 2 es mayor que 10.
-2 > 10
-
-# Instalación y llamada de una librería:
-# Instala y llama a la librería dplyr en R.
-# Puede usar la librería ‘pacman‘ o las funciones install.packages() y require().
-install.packages("dplyr")
-library(dplyr)
-
-# Obtener información sobre una función:
-# Usando la función de ayuda, obtén información sobre sum().
-# Muestra un ejemplo de cómo se usa.
-help(sum)
-# Ejemplo: Suma de los elementos de un vector.
-sum(1:3)
-
-
-# FUNDAMENTOS DE PROGRAMACIÓN: OBJETOS Y WORKSPACE
-#----------------------------------------------------------
-
-# Creación y eliminación de objetos en el workspace:
-# Crea un objeto llamado mi_numero y asígnale el valor numérico 25
-# Crea otro obJeto llamado mi_numero_2 que sea igual al objeto mi_numero a la potencia de 2.
-# Ahora elimine el objeto mi_numero del workspace utilizando las funciones vistas en clase.
-mi_numero <- 25
-mi_numero2 <- (mi_numero)**2
-rm(mi_numero)
-
-# Mostrar lista de objetos en el workspace:
-ls()
-
-# Guardar el contenido del workspace en un archivo:
-# Haga un ejemplo guardando el contenido del workspace en un archivo llamado "backup.RData".
-# (**Hint:** Use la función save.image())
-getwd() # PAra verificar mi directorio de trabajo actual
-setwd("C:/Users/jhanc/OneDrive - Universidad de los andes/CURSOS/2024-1 TallerR/Problem Set/01") # Defino el directorio de trabajo
-save.image(file = "backup.RData") # Guardo el contenido del workspace
-
-
-# ESTRUCTURA DE DATOS EN R: VECTORES Y DATAFRAMES
-#-------------------------------------------------------
-
-# Creación de un vector llamado mi_vector.
-# Debe contener los nombres de los días de la semana.
-mi_vector <- c("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")
-print(mi_vector)
-
-# Creación de una matriz numérica:
-# Defina mi_matriz de 3 filas y 2 columnas con valores numéricos de tu elección.
-mi_matriz <- matrix(c(1, 2, 3, 4, 5, 6), nrow = 3, ncol = 2)
-print(mi_matriz)
-
-# Creación de un dataframe y acceso a columna:
-# Cree mi_dataframe con dos columnas: "nombre" y "edad", y agrega algunos datos.
-mi_dataframe <- data.frame(nombre = c("Jhan", "Camilo", "Juan"), edad = c(25, 30, 35))
-print(mi_dataframe)
-mi_dataframe$nombre # Llamo a la columna nombre
-
-# Tibbles: Convierta mi_dataframe en un tibble y muestra cómo se accede a la columna "nombre".
-install.packages("tibble") # Instalo tibble
-library(tibble) # Cargo tibble
-
-mi_tibble <- as_tibble(mi_dataframe) # convierto el dataframe a tibble
-print(mi_tibble)
-
-mi_tibble$nombre # Forma 1: Acceso a la columna "nombre" en un tibble
-mi_tibble[["nombre"]] # Forma 2: Acceso a la columna "nombre" en un tibble
-
-
-
-# ESTRUCTURA DE DATOS EN R: LISTAS Y MANIPULACIÓN
-#-------------------------------------------------------
-
-# Creación de una lista:
-# Genere mi_lista que contenga un vector numérico, un dataframe y un valor lógico.
-mi_lista <- list(vector_numerico = c(1, 2, 3), dataframe = mi_dataframe, valor_logico = TRUE)
-print(mi_lista)
-
-# Acceso a elementos de una lista:
-# Muestre un ejemplo cómo acceder al segundo elemento del vector dentro de mi_lista.
-mi_lista$vector_numerico[2] # Acceder al segundo elemento del vector dentro de mi_lista
-
-# Combinación de listas:
-# Genere dos listas vacias y llamelas lista1 y lista2
-lista1 <- list()
-lista2 <- list()
-# Luego combinelas en una nueva lista llamada lista_combinada.
-lista_combinada <- c(lista1, lista2)
-
-
-# Cree una Lista de listas:
-# Cada elemento sea una lista que contenga un vector de nombres y un dataframe.
-# Puede usar los objetos mi_dataframe y mi_vector.
-lista_de_listas <- list(vector_nombres = mi_vector, dataframe = mi_dataframe)
-print(lista_de_listas)
-
-# Otro ejemplo:
-lista_de_listas_1 <- list(
-  lista_1 = list(vector_nombres = mi_vector, dataframe = mi_dataframe),
-  lista_2 = list(vector_nombres = c("Nombre_1", "Nombre_2"), dataframe = data.frame(nombre = c("Persona_1", "Persona_2"), edad = c(21, 22)))
-)
-print(lista_de_listas_1)
