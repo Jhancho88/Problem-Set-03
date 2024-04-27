@@ -297,7 +297,7 @@ p <- ggplot(aggregated_data_long, aes(x = MES, y = Valor, color = Tipo_Tasa, gro
 print(p)
 
 # Guardar el gráfico con una resolución y tamaño aumentados
-ggsave("tasa_desempleo_ocupacion_meses.png", p, width = 12, height = 8, dpi = 300)
+ggsave("output/tasa_desempleo_ocupacion_meses.png", p, width = 12, height = 8, dpi = 300)
 
 
 # Con meses a texto
@@ -334,4 +334,4 @@ p <- ggplot(aggregated_data_long, aes(x = MES, y = Valor, color = Tipo_Tasa, gro
 print(p)
 
 # Guardar el gráfico con mejoras
-ggsave("tasa_desempleo_ocupacion_meses.png", p, width = 12, height = 8, dpi = 300)
+ggsave("output/tasa_desempleo_ocupacion_meses1.png", p, width = 12, height = 8, dpi = 300)
