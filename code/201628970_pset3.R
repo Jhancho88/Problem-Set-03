@@ -272,3 +272,66 @@ print(p)
 # Guardar el gráfico
 ggsave("output/tasa_desempleo_ocupacion.png", p, width = 12, height = 8, dpi = 300)
 
+
+# Tercer intento de grafico para mostrar mejor los meses
+# Crear el gráfico con los meses en el eje X
+p <- ggplot(aggregated_data_long, aes(x = MES, y = Valor, color = Tipo_Tasa, group = Tipo_Tasa)) +
+  geom_line(size = 1) +  # Líneas más gruesas para mejor visualización
+  scale_x_discrete(name = "Mes") +
+  scale_y_continuous(name = "Valor de la Tasa", labels = scales::percent_format(scale = 1)) +
+  scale_color_manual(values = c("Tasa_Desempleo" = "red", "Tasa_Ocupacion" = "blue")) +
+  labs(title = "Tasas de Desempleo y Ocupación por Mes",
+       subtitle = "Datos de la Gran Encuesta Integrada de Hogares (GEIH) 2023",
+       caption = "Fuente: DANE") +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 14),
+    plot.caption = element_text(size = 12),
+    axis.text.x = element_text(angle = 45, hjust = 1), # Etiquetas del eje X rotadas
+    legend.title = element_text(size = 14),
+    legend.text = element_text(size = 14)
+  )
+
+# Mostrar el gráfico
+print(p)
+
+# Guardar el gráfico con una resolución y tamaño aumentados
+ggsave("tasa_desempleo_ocupacion_meses.png", p, width = 12, height = 8, dpi = 300)
+
+
+# Con meses a texto
+# Suponiendo que aggregated_data_long ya tiene las columnas MES, Tipo_Tasa y Valor
+
+# Mapear los números de mes a nombres de mes en español
+meses <- c('01' = 'Enero', '02' = 'Febrero', '03' = 'Marzo', '04' = 'Abril',
+           '05' = 'Mayo', '06' = 'Junio', '07' = 'Julio', '08' = 'Agosto',
+           '09' = 'Septiembre', '10' = 'Octubre', '11' = 'Noviembre', '12' = 'Diciembre')
+
+# Transformar los códigos de mes a nombres de mes
+aggregated_data_long$MES <- factor(aggregated_data_long$MES, levels = names(meses), labels = meses)
+
+# Crear el gráfico
+p <- ggplot(aggregated_data_long, aes(x = MES, y = Valor, color = Tipo_Tasa, group = Tipo_Tasa)) +
+  geom_line(size = 1) +
+  scale_x_discrete(name = "Mes") +
+  scale_y_continuous(name = "Valor de la Tasa", labels = scales::percent_format(scale = 1)) +
+  scale_color_manual(values = c("Tasa_Desempleo" = "red", "Tasa_Ocupacion" = "blue")) +
+  labs(title = "Tasas de Desempleo y Ocupación por Mes",
+       subtitle = "Datos de la Gran Encuesta Integrada de Hogares (GEIH) 2023",
+       caption = "Fuente: DANE") +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 14),
+    plot.caption = element_text(size = 12),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.title = element_text(size = 14),
+    legend.text = element_text(size = 14)
+  )
+
+# Mostrar el gráfico
+print(p)
+
+# Guardar el gráfico con mejoras
+ggsave("tasa_desempleo_ocupacion_meses.png", p, width = 12, height = 8, dpi = 300)
